@@ -1,0 +1,750 @@
+---
+title: "Project4_YifeiZhang"
+author: "Yifei Zhang"
+date: "11/12/2021"
+output: html_document
+---
+# Libraries
+```{r,message=FALSE,warning=FALSE}
+options(yardstick.event_first = FALSE)
+library(tidyverse)
+library(tidymodels)
+library(janitor)
+library(skimr)
+library(vip)
+library(parallel)
+library(doParallel)
+library(embed)
+library(textrecipes)
+library(text2vec)
+library(textdata)
+library(stringr)
+library(tidytext)
+```
+
+# Load in Data
+```{r}
+car <- read_csv("project_4_training-2.csv") %>% clean_names()
+kaggle <- read_csv("project_4_kaggle-2.csv") %>% clean_names()
+
+head(car)
+head(kaggle)
+
+```
+
+# Data Profile
+```{r}
+car %>% skim_without_charts()
+#kaggle %>% skim_without_charts()
+```
+# 
+```{r}
+car %>% 
+  group_by(is_bad_buy) %>% 
+  summarise(n = n()) %>% 
+  mutate(pct = round(n / sum(n),4)) -> car_pct
+
+car_pct
+
+car_pct %>% 
+  ggplot(aes(x = is_bad_buy, y = pct)) + 
+  geom_col() + 
+  geom_text(aes(label = pct), vjust = -0.5, color = "red") + 
+  labs(title = "Bad Buy Percentage")
+```
+
+# Explore Relationship (Numeric Variables)
+```{r,message=FALSE,warning=FALSE}
+## -- Does vehicle year impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = veh_year)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. Vehicle Year")
+
+## -- Does vehicle age impact the Bad Purchase?
+car%>%
+  mutate(vehicle_age = as.character(vehicle_age))%>%
+  mutate(is_bad_buy = as_factor(is_bad_buy))%>%
+  ggplot(aes(x = vehicle_age)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() +
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. Vehicle Age")
+
+
+## -- Does wheel type ID impact the Bad Purchase?
+car %>% 
+  mutate(wheel_type_id = as.character(wheel_type_id)) %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = wheel_type_id)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() +
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. Wheel Type ID")
+
+## -- Does vehicle year impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = veh_odo)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. Vehicle Odo")
+
+## -- Does MMR Acquisition Auction Average Price impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = mmr_acquisition_auction_average_price)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. MMR Acquisition Auction Average Price")
+
+## -- Does MMR Acquisition Auction Clean Price impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = mmr_acquisition_auction_clean_price)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. MMR Acquisition Auction Clean Price")
+
+## -- Does MMR Acquisition Retail Average Price impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = mmr_acquisition_retail_average_price)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. MMR Acquisition Retail Average Price")
+
+## -- Does MMR Acquisition Retail Clean Price impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = mmr_acquisiton_retail_clean_price)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. MMR Acquisition Retail Clean Price")
+
+## -- Does MMR Current Auction Average Price impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = mmr_current_auction_average_price)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. MMR Current Auction Average Price")
+
+## -- Does MMR Current Auction Clean Price impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = mmr_current_auction_clean_price)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. MMR Current Auction Clean Price")
+## -- Does MMR Current Retail Average Price impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = mmr_current_retail_average_price)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. MMR Current Retail Average Price")
+
+## -- Does MMR Current Retail Clean Price impact the Bad Purchase? 
+car %>% 
+  mutate(is_bad_buy = as_factor(is_bad_buy)) %>% 
+  ggplot(aes(x = mmr_current_retail_clean_price)) + 
+  geom_bar(aes(fill = is_bad_buy), position = "fill") + 
+  coord_flip() + 
+  geom_hline(yintercept = 0.1249, color = "red") + 
+  labs(title = "Bad Purchase vs. MMR Current Retail Clean Price")
+
+
+
+
+
+
+
+```
+
+# Explore Relation (Categorical Variables)
+```{r}
+## -- Does Auction impact the Bad Purchase?
+car %>% 
+  group_by(auction, is_bad_buy) %>% 
+  summarise(n = n()) %>% 
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill = 0) %>% 
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(auction, is_bad_buy) %>%
+  summarise(n = n()) %>%
+  mutate(pct= n / sum(n)) %>%
+  ggplot(aes(y = reorder(auction,pct), x = n, fill = auction)) +
+  geom_col(position = "fill") + 
+  geom_vline(xintercept = 0.8751, color = "red") +
+  labs(title = "Auction vs. Bad Purchase") +
+  xlab("Pct") + ylab("Auction")+
+  coord_flip()
+
+## -- Does Make impact the Bad Purchase?
+car %>% 
+  group_by(make, is_bad_buy) %>% 
+  summarise(n = n()) %>% 
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill = 0) %>% 
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(make, is_bad_buy) %>%
+  summarise(n = n()) %>%
+  mutate(pct= n / sum(n)) %>%
+  ggplot(aes(y = reorder(make,pct), x = n, fill = make)) +
+  geom_col(position = "fill") + 
+  geom_vline(xintercept = 0.8751, color = "red") +
+  labs(title = "Make vs. Bad Purchase") +
+  xlab("Pct") + ylab("Make")+
+  coord_flip()
+
+## -- Does model impact the Fraudulent? 
+car %>% 
+  group_by(model, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(model, is_bad_buy) %>%
+  summarise(n = n()) %>%
+  mutate(pct = n/sum(n)) %>%
+  ggplot(aes(y = reorder(model,pct), x = n, fill = is_bad_buy)) +
+  geom_col(position = "fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Model vs. Bad Purchase") +
+  xlab("Pct") + ylab("Model") +
+  coord_flip()
+
+## -- Does trim impact the Bad Purchase? 
+car %>% 
+  group_by(trim, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(trim, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(trim,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Trim vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Trim")+
+  coord_flip()
+
+## -- Does sub-model impact the Bad Purchase? 
+car %>% 
+  group_by(sub_model, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(sub_model, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(sub_model,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Sub Model vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Sub Model")+
+  coord_flip()
+
+## -- Does color impact the Bad Purchase? 
+car %>% 
+  group_by(color, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(color, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(color,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Color vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Color")+
+  coord_flip()
+
+## -- Does trim impact the Bad Purchase? 
+car %>% 
+  group_by(transmission, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(transmission, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(transmission,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Transmission vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Transmission")+
+  coord_flip()
+
+## -- Does wheel type impact the Bad Purchase? 
+car %>% 
+  group_by(wheel_type, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(wheel_type, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(wheel_type,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Wheel Type vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Wheel Type")+
+  coord_flip()
+
+## -- Does nationality impact the Bad Purchase? 
+car %>% 
+  group_by(nationality, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(nationality, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(nationality,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Nationality vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Nationality")+
+  coord_flip()
+
+## -- Does size impact the Bad Purchase? 
+car %>% 
+  group_by(size, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(size, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(size,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Size vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Size")+
+  coord_flip()
+
+## -- Does top three America Name impact the Bad Purchase? 
+car %>% 
+  group_by(top_three_american_name, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(top_three_american_name, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(top_three_american_name,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Top Three American Name vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Top Three American Name")+
+  coord_flip()
+
+## -- Does trim impact the Bad Purchase? 
+car %>% 
+  group_by(trim, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(trim, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(trim,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Trim vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Trim")+
+  coord_flip()
+
+## -- Does VNST impact the Bad Purchase? 
+car %>% 
+  group_by(vnst, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(vnst, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(vnst,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "VNST vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("VNST")+
+  coord_flip()
+
+## -- Does quality code impact the Bad Purchase? 
+car %>% 
+  group_by(quality_code, is_bad_buy) %>%
+  summarise(n=n())  %>%
+  pivot_wider(names_from = is_bad_buy, values_from = n, values_fill=0) %>%
+  mutate(n = `0` + `1`,
+         pct_GT = round(`1`/n,3)) %>%
+  arrange(desc(pct_GT)) -> frequency
+
+car %>% 
+  group_by(quality_code, is_bad_buy) %>%
+  summarise(n=n()) %>%
+  mutate(pct=n/sum(n)) %>%
+  ggplot(aes(y=reorder(quality_code,pct), x=n, fill=is_bad_buy)) +
+  geom_col(position="fill") + 
+  geom_vline(xintercept = 0.8751, color = "red")+
+  labs(title = "Quality Code vs. Bad Purchase")+
+  xlab("Pct")+
+  ylab("Quality Code")+
+  coord_flip()
+
+
+```
+# Factoring Converting
+```{r}
+car_bad <- car %>% 
+  mutate_if(is.character,as_factor) %>%
+  mutate(is_bad_buy = as_factor(is_bad_buy))
+```
+
+# Train & Test Split
+```{r,message=FALSE, warning=FALSE}
+set.seed(43)
+
+train_test_spit<- initial_split(car_bad, prop = 0.7, strata = is_bad_buy)
+
+train <- training(train_test_spit)
+test  <- testing(train_test_spit)
+
+sprintf("Train PCT : %1.2f%%", nrow(train)/ nrow(car_bad) * 100)
+sprintf("Test  PCT : %1.2f%%", nrow(test)/ nrow(car_bad) * 100)
+
+train_cv_folds <- vfold_cv(train, v=5)
+train_cv_folds
+
+```
+
+
+
+# Recipe & Bake
+```{r}
+car_recipe <- recipe(is_bad_buy ~., data = train) %>% 
+  step_rm(id, purch_date, model,sub_model)%>%
+  step_novel(all_nominal_predictors()) %>%
+  step_impute_mean(all_numeric_predictors()) %>%
+  step_impute_mode(all_nominal_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors()) 
+
+```
+
+# XGBoost Model
+```{r}
+xgb_model <- boost_tree(
+  trees = 20, 
+  tree_depth = tune(),       
+  min_n = tune(),           
+  learn_rate = tune()
+) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("classification")
+
+xgb_workflow <- workflow() %>%
+  add_recipe(car_recipe) %>%
+  add_model(xgb_model) 
+
+tune_grid <- grid_random(tree_depth(),
+                          min_n(),
+                          learn_rate(),
+                          size = 10)
+
+print(tune_grid)
+
+xgb_tuning_results <- xgb_workflow %>% 
+  tune_grid(
+    resamples = train_cv_folds,
+    grid = tune_grid,
+    control = control_resamples(save_pred = TRUE)
+    )
+
+xgb_tuning_results
+
+
+# Review the results
+xgb_tuning_results %>%
+  collect_metrics() %>%
+  mutate_if(is.numeric, round,3) %>%
+  pivot_wider(names_from = .metric, values_from=c(mean, std_err))
+```
+
+# Visualize the Model
+```{r}
+xgb_tuning_results %>%
+  collect_metrics() %>%
+  mutate_if(is.numeric, round,3) %>%
+  ggplot(aes(learn_rate, mean, )) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+
+xgb_tuning_results %>%
+  collect_metrics()  %>%
+  mutate_if(is.numeric, round,3) %>%
+  ggplot(aes(min_n, mean, )) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+
+xgb_tuning_results %>%
+  collect_metrics()  %>%
+  mutate_if(is.numeric, round,3) %>%
+  ggplot(aes(tree_depth, mean, )) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+```
+
+# Pick the Best
+```{r,message=FALSE,warning=FALSE}
+xgb_tuning_results %>%
+  show_best("roc_auc") %>%
+  print()
+
+xgb_best <- xgb_tuning_results %>%
+  select_best("roc_auc") 
+
+print(xgb_best)
+
+xgb_final_wf <- xgb_workflow %>% 
+  finalize_workflow(xgb_best)
+
+print(xgb_final_wf)
+
+xgb_final_fit  <- xgb_final_wf %>%
+  parsnip::fit(data = train) 
+
+xgb_final_fit%>%
+  pull_workflow_fit() %>% 
+  vip(10)
+
+```
+
+
+# Evaluate
+```{r}
+predict(xgb_final_fit, train, type = "prob") %>%
+  bind_cols(predict(xgb_final_fit, train, type="class")) %>%
+  bind_cols(.,train) -> xgb_scored_train 
+
+predict(xgb_final_fit, test, type = "prob") %>%
+    bind_cols(predict(xgb_final_fit,test,type="class")) %>%
+    bind_cols(., test) -> xgb_scored_test   
+
+# -- Metrics: Train and Test 
+xgb_scored_train %>% 
+  metrics(is_bad_buy, .pred_class) %>%
+  mutate(part="training") %>%
+  bind_rows( xgb_scored_test %>% 
+               metrics(is_bad_buy, .pred_class) %>%
+               mutate(part="testing") ) %>%
+  pivot_wider(names_from = .metric, values_from=.estimate)
+
+```
+
+# Randome Forest Model
+```{r,warning=FALSE, message=FALSE}
+rf_model <- rand_forest(trees  = tune(), min_n = tune(),) %>% 
+      set_engine("ranger", importance = "impurity") %>% 
+      set_mode("classification")
+
+rf_workflow <- workflow() %>%
+  add_recipe(car_recipe) %>%
+  add_model(rf_model)
+
+tune_grid <- grid_regular(trees(c(100,200)),
+                          min_n(),
+                          levels = 5)
+
+print(tune_grid)
+
+rf_tuning_results <- rf_workflow %>% 
+  tune_grid(
+    resamples = train_cv_folds,
+    grid = tune_grid,
+    control = control_resamples(save_pred = TRUE)
+    )
+
+rf_tuning_results
+```
+
+# Review Tuning Results
+# Pick the Best One
+```{r,warning=FALSE}
+rf_tuning_results %>% 
+  collect_metrics() %>%
+  mutate_if(is.numeric, round,3) %>% 
+  pivot_wider(names_from = .metric, values_from=c(mean, std_err)) 
+
+rf_tuning_results %>%
+  show_best("roc_auc") %>%
+  print()
+
+rf_best <- rf_tuning_results %>%
+  select_best("roc_auc") 
+
+print(rf_best)
+
+rf_final_wf <- rf_workflow %>% 
+  finalize_workflow(rf_best) 
+
+print(rf_final_wf)
+
+rf_final_fit  <- rf_final_wf %>%
+  parsnip::fit(data = train) 
+
+rf_final_fit%>%
+  pull_workflow_fit() %>% 
+  vip(10)
+
+```
+
+# Evaluate 
+```{r}
+predict(rf_final_fit, train, type = "prob") %>%
+    bind_cols(predict(rf_final_fit, train, type="class")) %>%
+  bind_cols(.,train)-> rf_scored_train 
+
+predict(rf_final_fit, test, type = "prob") %>%
+    bind_cols(predict(rf_final_fit, test, type="class")) %>%
+     bind_cols(., test) -> rf_scored_test   
+
+# -- Metrics: Train and Test 
+rf_scored_train %>% 
+  metrics(is_bad_buy, .pred_class) %>%
+  mutate(part="training") %>%
+  bind_rows( rf_scored_test %>% 
+               metrics(is_bad_buy, .pred_class) %>%
+               mutate(part="testing") ) %>%
+  pivot_wider(names_from = .metric, values_from=.estimate)
+
+## -- Accuracy 
+bind_rows(
+  rf_scored_train %>%
+    mutate(model = "Random Forest Train"),
+  rf_scored_test %>%
+    mutate(model = "Random Forest Test"),
+  xgb_scored_train %>%
+    mutate(model = "Xgboost Train"),
+  xgb_scored_test %>%
+    mutate(model = "Xgboost Test")) %>%
+  group_by(model) %>%
+  metrics(is_bad_buy, estimate = .pred_class, .pred_1) %>%
+  pivot_wider(id_cols = model, values_from = .estimate, names_from = .metric)
+
+## -- ROC Table
+bind_rows(
+  rf_scored_test %>%
+  mutate(model = "Random Forest"),
+  xgb_scored_test %>%
+  mutate(model = "Xgboost reg")) %>%
+  group_by(model) %>%
+  roc_curve(is_bad_buy, .pred_1) %>%
+  autoplot() +
+  geom_vline(xintercept=0.1, color="red") +
+  labs(title = "ROC chart")
+```
+
+
+# Kaggle
+```{r}
+kaggle<- kaggle %>% 
+  mutate_if(is.character, as_factor) 
+         
+
+#new_benchmark <- predict(xgb_final_fit,kaggle, type = "prob") %>%
+  # bind_cols(kaggle) %>%
+  # dplyr::select(ID =id, IsBadBuy= .pred_1)
+  
+new_benchmark <- predict(rf_final_fit,kaggle, type = "prob") %>%
+  bind_cols(kaggle) %>%
+  dplyr::select(ID =id, IsBadBuy = .pred_1)
+
+head(new_benchmark)
+ 
+write_csv(new_benchmark,"Project4_kaggle_prediction.csv")
+```
+
+
+
+
+
+
+
