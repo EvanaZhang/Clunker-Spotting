@@ -1,7 +1,7 @@
 # Clunker-Spotting
 Machine Learning Application with R (Random Forest, XGBoost)
 
-Executive Summary
+Executive Summary (All tables and figures are shown in PDF file)
 [Clunker Spotting Report.pdf](https://github.com/EvanaZhang/Clunker-Spotting/files/9805210/Clunker.Spotting.Report.pdf)
 
 
